@@ -45,18 +45,51 @@ def providers() -> list[SearchProvider]:
 
 
 def search_all(query: str, limit: int = 5) -> list[Paper]:
-    """Search every provider, merging and deduping results.
+    """Search every provider concurrently using ThreadPoolExecutor,
+    merging, deduping, and ranking results by citation count and year.
 
-    Provider failures are logged and swallowed here: callers see the
-    outcome (fewer results), never the provider internals.
+    Provider failures (including scholarly/scraping errors) are logged and
+    swallowed here: callers see the outcome, never the provider internals.
     """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
     papers: list[Paper] = []
-    for provider in providers():
+    prov_list = providers()
+    if not prov_list:
+        return papers
+
+    def _search_one(provider: SearchProvider) -> list[Paper]:
         try:
-            papers.extend(provider.search(query, limit))
+            return provider.search(query, limit)
         except Exception:
             logger.exception("provider '%s' search failed", provider.name)
-    return _dedupe(papers)
+            return []
+
+    with ThreadPoolExecutor(max_workers=len(prov_list)) as executor:
+        futures = {executor.submit(_search_one, p): p for p in prov_list}
+        for future in as_completed(futures):
+            try:
+                res = future.result()
+                if res:
+                    papers.extend(res)
+            except Exception:
+                provider = futures[future]
+                logger.exception("provider '%s' search execution failed", provider.name)
+
+    deduped = _dedupe(papers)
+    return _rank(deduped)
+
+
+def _rank(papers: list[Paper]) -> list[Paper]:
+    """Sort papers by citation count (descending) and year (descending).
+
+    None values for citations or year are treated as 0 / 0 (or lowest priority).
+    """
+    return sorted(
+        papers,
+        key=lambda p: (p.citations if p.citations is not None else 0, p.year if p.year is not None else 0),
+        reverse=True,
+    )
 
 
 def resolve(ref: "PaperRef") -> Paper | None:

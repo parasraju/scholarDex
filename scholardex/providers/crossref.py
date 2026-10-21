@@ -31,8 +31,9 @@ def _from_item(item: dict, source: str = "Crossref") -> Paper:
     return Paper(
         title=title[0],
         authors=[
-            a.get("family", "") + " " + a.get("given", "")
+            f"{a.get('given', '').strip()} {a.get('family', '').strip()}".strip()
             for a in item.get("author", [])
+            if a.get("given", "") or a.get("family", "")
         ],
         year=_clean_year(
             item.get("issued") or item.get("published-print") or item.get("published-online")

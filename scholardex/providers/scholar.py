@@ -25,8 +25,13 @@ class ScholarProvider:
 
     def search(self, query: str, limit: int = 5) -> list[Paper]:
         try:
-            from scholarly import scholarly
-        except ImportError:
+            import sys
+            # Avoid hanging if scholarly or its dependencies block or misbehave
+            import warnings
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                from scholarly import scholarly
+        except Exception:
             return []
 
         papers: list[Paper] = []

@@ -79,9 +79,9 @@ def library() -> None:
 
 @app.command()
 def export(
-    format: str = typer.Option("md", "--format", "-f", help="Export format: md, json, or all"),
+    format: str = typer.Option("md", "--format", "-f", help="Export format: md, json, bib, or all"),
 ) -> None:
-    """Export the library to Markdown/JSON."""
+    """Export the library to Markdown, JSON, or BibTeX."""
     _run(lambda sdk: _do_export(sdk, format))
 
 
@@ -122,12 +122,13 @@ def _do_search(sdk: ScholarDex, query: str, count: int, pick: Optional[int], sav
     table.add_column("Citations", justify="right")
     table.add_column("Source")
     for i, p in enumerate(papers, 1):
+        citations_str = str(p.citations) if (p.citations is not None and p.citations > 0) else "-"
         table.add_row(
             str(i),
             p.title[:100],
             str(p.year or "?"),
-            str(p.citations) if p.citations else "-",
-            p.source,
+            citations_str,
+            p.source or "unknown",
         )
     console.print(table)
 
@@ -191,9 +192,17 @@ def _do_library(sdk: ScholarDex) -> None:
     table = Table(title="scholarDex Library")
     table.add_column("Title", style="bold")
     table.add_column("Year", justify="right")
+    table.add_column("Citations", justify="right")
     table.add_column("Source")
     for meta in papers:
-        table.add_row(meta["title"][:80], str(meta.get("year") or "?"), meta.get("source", ""))
+        citations = meta.get("citations")
+        citations_str = str(citations) if (citations is not None and citations > 0) else "-"
+        table.add_row(
+            meta["title"][:80],
+            str(meta.get("year") or "?"),
+            citations_str,
+            meta.get("source", ""),
+        )
     console.print(table)
 
 

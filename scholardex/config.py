@@ -24,13 +24,22 @@ _DEFAULT_CONFIG = {"gemini": {"api_key": "", "model": DEFAULT_MODEL}}
 def load_config() -> dict:
     """Load config, creating defaults if missing."""
     if not CONFIG_PATH.exists():
-        save_config(_DEFAULT_CONFIG)
-    return toml.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+        try:
+            save_config(_DEFAULT_CONFIG)
+        except Exception as e:
+            raise ConfigError(f"Could not create default config at {CONFIG_PATH}: {e}") from e
+    try:
+        return toml.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+    except Exception as e:
+        raise ConfigError(f"Could not read config file at {CONFIG_PATH}: {e}") from e
 
 
 def save_config(config: dict) -> None:
-    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    CONFIG_PATH.write_text(toml.dumps(config), encoding="utf-8")
+    try:
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        CONFIG_PATH.write_text(toml.dumps(config), encoding="utf-8")
+    except Exception as e:
+        raise ConfigError(f"Could not save config file at {CONFIG_PATH}: {e}") from e
 
 
 def api_key() -> str:

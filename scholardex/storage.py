@@ -49,7 +49,14 @@ def _save_index(index: dict) -> None:
 def save_paper(paper: Paper, result: SummaryResult) -> Path:
     """Persist a paper + its summary, returning the Markdown path."""
     _ensure_dirs()
-    slug = _slug(paper.title, paper.year)
+    base_slug = _slug(paper.title, paper.year)
+    slug = base_slug
+    index = _load_index()
+    counter = 1
+    while slug in index:
+        slug = f"{base_slug}-{counter}"
+        counter += 1
+
     md_path = LIBRARY_DIR / f"{slug}.md"
     date = datetime.now().strftime("%Y-%m-%d %H:%M")
 
@@ -71,7 +78,6 @@ def save_paper(paper: Paper, result: SummaryResult) -> Path:
     ]
     md_path.write_text("\n".join(md), encoding="utf-8")
 
-    index = _load_index()
     index[slug] = {
         "title": paper.title,
         "year": paper.year,
@@ -88,13 +94,28 @@ def save_paper(paper: Paper, result: SummaryResult) -> Path:
 
 
 def list_papers() -> list[dict]:
-    """Return saved papers, newest first."""
+    """Return saved papers, newest added first."""
     index = _load_index()
     return sorted(
         index.values(),
-        key=lambda meta: str(meta.get("year", "")),
+        key=lambda meta: meta.get("added", ""),
         reverse=True,
     )
+
+
+def delete_paper(slug: str) -> bool:
+    """Delete a saved paper by its slug from the library index and disk."""
+    index = _load_index()
+    if slug not in index:
+        return False
+    meta = index.pop(slug)
+    file_path = meta.get("file")
+    if file_path:
+        p = Path(file_path)
+        if p.exists():
+            p.unlink()
+    _save_index(index)
+    return True
 
 
 def index_path() -> Path:
